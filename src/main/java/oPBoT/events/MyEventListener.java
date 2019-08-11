@@ -1,4 +1,8 @@
-package oPBoT;
+package oPBoT.events;
+
+import oPBoT.Commands;
+import oPBoT.OPBoT;
+import oPBoT.info.Strike;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -9,6 +13,7 @@ import net.dv8tion.jda.core.entities.ChannelType;
 import net.dv8tion.jda.core.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
 
+
 public class MyEventListener extends ListenerAdapter {
 	private static String commandChar = "!";
 	public void onGuildMessageReceived(GuildMessageReceivedEvent e) {
@@ -16,19 +21,14 @@ public class MyEventListener extends ListenerAdapter {
 		
 		String[] args = e.getMessage().getContentRaw().split(" ");
 		Commands command = new Commands(e);
-		Information usersInfo = null;
+		
+		Strike strikesInfo = null;
 		try {
-			usersInfo = new Information(e);
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (ParseException e1) {
-			// TODO Auto-generated catch block
+			strikesInfo = new Strike(e);
+		} catch (IOException | ParseException e1) {
 			e1.printStackTrace();
 		}
+		
 
 		//PING COMMAND
 		if (args[0].equalsIgnoreCase(commandChar + "ping")) {
@@ -79,7 +79,12 @@ public class MyEventListener extends ListenerAdapter {
 		
 		//STRIKE COMMAND
 		if (args[0].equalsIgnoreCase(commandChar + "strike")) {
-			command.strike(usersInfo);
+			try {
+				command.strike(strikesInfo);
+			} catch (IOException | ParseException e1) {
+				e1.printStackTrace();
+				OPBoT.sendToChannel(e.getChannel(), "OPBoT has encountered an issue.");
+			}
 			return;
 		}
 		

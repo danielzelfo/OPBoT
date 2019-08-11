@@ -2,33 +2,48 @@ package oPBoT;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 import javax.swing.Timer;
 
+import org.json.simple.parser.ParseException;
+
+import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.Permission;
 import net.dv8tion.jda.core.entities.*;
 import net.dv8tion.jda.core.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.core.exceptions.PermissionException;
 import net.dv8tion.jda.core.managers.AudioManager;
+import oPBoT.info.Strike;
 
 public class Commands {
-	private static GuildMessageReceivedEvent event;
-	private static String userName;
-	private static AudioManager audioManager;
-	private static VoiceChannel connectedChannel;
-	private static String secondaryCommand;
-	private static Member selfMember;
+	private JDA jda;
+	private GuildMessageReceivedEvent event;
+	private String userName;
+	private AudioManager audioManager;
+	private VoiceChannel connectedChannel;
+	private String secondaryCommand;
+	private Member selfMember;
+	
+	public Commands(JDA jda) {
+		this.jda = jda;
+		this.event = null;
+		this.userName = "unknown";
+		this.audioManager = null;
+		this.connectedChannel = null;
+		this.secondaryCommand = null;
+		this.selfMember = null;
+	}
 	
 	public Commands(GuildMessageReceivedEvent e) {
+		this.jda = null;
 		this.event = e;
 		this.userName = e.getMember().getUser().getName();
 		this.audioManager = e.getGuild().getAudioManager();
 		this.connectedChannel = e.getGuild().getSelfMember().getVoiceState().getChannel();
 		this.secondaryCommand = getSecondaryCommand(e.getMessage().getContentRaw().split(" "));
 		this.selfMember = e.getGuild().getSelfMember();
-		
-		
-		
 	}
 
 	public void ping() {
@@ -252,7 +267,7 @@ public class Commands {
 	 * STRIKE 2 = PRIVATE MESSAGE + 2 DAY SUSPENSION
 	 * STRIKE 3 = PRIVATE MESSAGE + BAN 
 	 */
-	public void strike(Information usersInfo) {
+	public void strike(Strike usersInfo) throws FileNotFoundException, IOException, ParseException {
 		//no users mentioned
 		if (event.getMessage().getMentionedMembers().isEmpty()) {
 			OPBoT.sendToChannel(event.getChannel(), "You must mension at least 1 person to be banned, " + userName + ".");
@@ -279,9 +294,9 @@ public class Commands {
 				continue;
 			}
 			
-			usersInfo.setStrikeNumber(member.toString(), usersInfo.getStrikeNumber(member.toString()) + 1 );
-			OPBoT.sendToChannel(event.getChannel(), "Strike " + usersInfo.getStrikeNumber(member.toString()) + ", <@" + user.getId() + ">" + (usersInfo.getStrikeNumber(member.toString()) >= 3 ? "\nYOU'RE OUT!" : ""));
-			switch(usersInfo.getStrikeNumber(member.toString())) {
+			usersInfo.setStrikeNumber(user.getId(), usersInfo.getStrikeNumber(user.getId()) + 1 );
+			OPBoT.sendToChannel(event.getChannel(), "Strike " + usersInfo.getStrikeNumber(user.getId()) + ", <@" + user.getId() + ">" + (usersInfo.getStrikeNumber(user.getId()) >= 3 ? "\nYOU'RE OUT!" : ""));
+			switch(usersInfo.getStrikeNumber(user.getId())) {
 				case 1:
 					OPBoT.sendToUser(user, "You have recieved your first strike from the server " + event.getGuild().getName() + "\n"
 										 + "Recieving a second strike will result in a 2 day suspension!"
@@ -320,36 +335,58 @@ public class Commands {
 	 * 
 	 * ISSUE -- suspension delay to unban goes away once a new message event happens!
 	 */
+	
+	//this method is used by the EventListener
 	public void suspend() {
 		int numberMembersMensioned = event.getMessage().getMentionedMembers().size();
 		if( secondaryCommand.split(" ").length == numberMembersMensioned + 1 ) {
-			suspend(0, Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 1]));
+			suspend(Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 1]), 0);
 			return;
 		}
 		if ( secondaryCommand.split(" ").length == numberMembersMensioned + 2) {
-			suspend(Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 1]), Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 2]));
+			suspend(Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 2]), Integer.parseInt( secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 1]));
 			return;
 		}
 	}
-	public void suspend(int deletionDays, int duration) {
-		for(User suspendedUser: event.getMessage().getMentionedUsers())
+	
+	//this method is used by the strike method
+	public void suspend(int duration, int deletionDays) {
+		//no users mentioned
+		if (event.getMessage().getMentionedMembers().isEmpty()) {
+			OPBoT.sendToChannel(event.getChannel(), "You must mension at least 1 person to be suspended, " + userName + ".");
+			return;
+		}
+		
+		for(User suspendedUser: event.getMessage().getMentionedUsers()) {
 			OPBoT.sendToChannel(event.getChannel(), "<@"+suspendedUser.getId() + "> will be suspended for " + duration + " days.");
-		ban(deletionDays);
+			suspend(event.getMessage().getTextChannel(),  suspendedUser.getId(), duration, deletionDays);
+		}
 		
-		//setting a delay to unban the user
-		Timer timer = new Timer(86400000 * duration, new ActionListener() {
-		  @Override
-		  public void actionPerformed(ActionEvent arg0) {
-			  for (User user: event.getMessage().getMentionedUsers()) {
-				  	OPBoT.sendToChannel(event.getChannel(), "<@"+user.getId()+">'s suspension has ended!");
-					unban(user.getId());
-				}
-		  }
-		});
-		timer.setRepeats(false);
-		timer.start();
+		return;
+	}
+	
+	//this method is used by the EventScheduler
+	public void suspend(TextChannel textChannel, String userId, int duration, int deletionDays) {
 		
-		
+		User user = jda.getUserById(userId);
+		//user does not have permission to ban
+		if (!textChannel.getGuild().getMember(user).hasPermission(Permission.BAN_MEMBERS)) {
+			OPBoT.sendToChannel(textChannel, "You do not have permission to suspend members, " + userName + ". You must have the Ban Members permission.");
+			return;
+		}
+
+		//bot does not have the permission to ban
+		if (!textChannel.getGuild().getSelfMember().hasPermission(Permission.BAN_MEMBERS)) {
+			OPBoT.sendToChannel(textChannel, "I do not have permission to ban members.");
+			return;
+		}
+		ban(user);
+
+		/*
+		 * 
+		 * schedule UNBAN !!!
+		 * 
+		 */
 		
 		return;
 	}
