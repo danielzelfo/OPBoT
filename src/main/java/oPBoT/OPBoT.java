@@ -11,8 +11,8 @@ public class OPBoT {
 	
 	public static void main(String args[]) throws Exception {
 
-		JDA jda = new JDABuilder("NjA2NjA2NjA5NjYxMDM0NTA3.XUlN1A.qR0-g687DjeVWlks85RaPG75pG4").build();
-		EventScheduler sheduler = new EventScheduler(jda);
+		JDA jda = new JDABuilder("").build();
+		//EventScheduler sheduler = new EventScheduler(jda);
 		jda.addEventListener(new MyEventListener());
 	}
 

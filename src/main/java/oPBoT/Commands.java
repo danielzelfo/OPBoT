@@ -149,6 +149,22 @@ public class Commands {
 	/*
 	 * deletionDays is for number of days back messages will be deleted
 	 */
+	
+	public void ban(User user, Guild guild, int deletionDays, TextChannel channel) {
+		guild.getController().ban(guild.getMember(user), deletionDays).queue(
+				success -> OPBoT.sendToChannel(channel, "<@" + user.getId() + "> has been banned."),
+				//error banning
+				error -> {
+					if (error instanceof PermissionException)
+						OPBoT.sendToChannel(channel, "Permission error occured while banning <@" + user.getId() + ">.\n " + error.getMessage());
+					else
+						OPBoT.sendToChannel(channel, "Unknown error occured while banning <@" + user.getId() + ">.\n" + error.getClass().getSimpleName() + "\n" + error.getMessage());
+				}
+			);
+		
+	}
+	
+	
 	public void ban() {
 		ban( secondaryCommand.split(" ").length >= 2 ? Integer.parseInt(secondaryCommand.split(" ")[secondaryCommand.split(" ").length - 1]) : 0 );
 	}
@@ -182,17 +198,7 @@ public class Commands {
 				continue;
 			}
 
-			
-			event.getGuild().getController().ban(member, deletionDays).queue(
-				success -> OPBoT.sendToChannel(event.getChannel(), "<@" + user.getId() + "> has been banned."),
-				//error banning
-				error -> {
-					if (error instanceof PermissionException)
-						OPBoT.sendToChannel(event.getChannel(), "Permission error occured while banning <@" + user.getId() + ">.\n " + error.getMessage());
-					else
-						OPBoT.sendToChannel(event.getChannel(), "Unknown error occured while banning <@" + user.getId() + ">.\n" + error.getClass().getSimpleName() + "\n" + error.getMessage());
-				}
-			);
+			ban(user, event.getGuild(), deletionDays, event.getChannel());
 		}
 	}
 	
@@ -359,14 +365,14 @@ public class Commands {
 		
 		for(User suspendedUser: event.getMessage().getMentionedUsers()) {
 			OPBoT.sendToChannel(event.getChannel(), "<@"+suspendedUser.getId() + "> will be suspended for " + duration + " days.");
-			suspend(event.getMessage().getTextChannel(),  suspendedUser.getId(), duration, deletionDays);
+			suspend(event.getMessage().getTextChannel(),  suspendedUser.getId(), event.getGuild().getId(), duration, deletionDays);
 		}
 		
 		return;
 	}
 	
 	//this method is used by the EventScheduler
-	public void suspend(TextChannel textChannel, String userId, int duration, int deletionDays) {
+	public void suspend(TextChannel textChannel, String userId, String guildId, int duration, int deletionDays) {
 		
 		User user = jda.getUserById(userId);
 		//user does not have permission to ban
@@ -380,7 +386,7 @@ public class Commands {
 			OPBoT.sendToChannel(textChannel, "I do not have permission to ban members.");
 			return;
 		}
-		ban(user);
+		ban(user, jda.getGuildById(guildId), deletionDays, textChannel);
 
 		/*
 		 * 

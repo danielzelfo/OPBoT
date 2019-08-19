@@ -77,6 +77,7 @@ public class MyEventListener extends ListenerAdapter {
 			return;
 		}
 		
+		/* THESE COMMANDS ARE A WORK IN PROGRESS *
 		//STRIKE COMMAND
 		if (args[0].equalsIgnoreCase(commandChar + "strike")) {
 			try {
@@ -93,6 +94,7 @@ public class MyEventListener extends ListenerAdapter {
 			command.suspend();
 			return;
 		}
+		*/
 	}
 
 
